@@ -333,6 +333,27 @@ class TestInferMemoryType:
         agent = _agent()
         assert agent._infer_memory_type(["debug", "pattern"]) == "error"
 
+    def test_prefer_in_content_maps_to_preference(self):
+        agent = _agent()
+        assert agent._infer_memory_type([], content="The user prefers spaces") == "preference"
+
+    def test_prefer_case_insensitive(self):
+        agent = _agent()
+        assert agent._infer_memory_type([], content="User PREFERS tabs") == "preference"
+
+    def test_prefer_content_with_no_preference_tag(self):
+        agent = _agent()
+        assert agent._infer_memory_type(["fact"], content="I prefer snake_case") == "preference"
+
+    def test_no_prefer_in_content_falls_through(self):
+        agent = _agent()
+        assert agent._infer_memory_type([], content="Python is interpreted") == "fact"
+
+    def test_error_tag_takes_priority_over_prefer_content(self):
+        agent = _agent()
+        # debug tag should still win even if content contains 'prefer'
+        assert agent._infer_memory_type(["debug"], content="I prefer this fix") == "error"
+
 
 # ---------------------------------------------------------------------------
 # _detect_contradictions()
@@ -351,28 +372,26 @@ class TestDetectContradictions:
         agent = _agent(ltm=ltm)
         assert agent._detect_contradictions() == []
 
-    def test_returns_empty_list_with_two_memories(self):
+    def test_calls_llm_for_group_with_two_memories(self):
         ltm = _mock_ltm()
         ltm.get_all.return_value = [_ltm_memory(), _ltm_memory()]
         agent = _agent(ltm=ltm)
-        # Only groups with 3+ trigger LLM; two memories → no LLM call
-        with patch.object(agent._client, "chat") as mock_chat:
-            result = agent._detect_contradictions()
-        mock_chat.assert_not_called()
-        assert result == []
+        # Threshold is now 2+, so two same-type memories trigger LLM
+        with patch.object(agent._client, "chat", return_value=_llm_response("NONE")) as mock_chat:
+            agent._detect_contradictions()
+        mock_chat.assert_called_once()
 
-    def test_skips_groups_with_fewer_than_3(self):
+    def test_skips_groups_with_fewer_than_2(self):
         ltm = _mock_ltm()
-        m1, m2 = _ltm_memory("fact A"), _ltm_memory("fact B")
-        ltm.get_all.return_value = [m1, m2]
+        ltm.get_all.return_value = [_ltm_memory("lone fact")]
         agent = _agent(ltm=ltm)
         with patch.object(agent._client, "chat") as mock_chat:
             agent._detect_contradictions()
         mock_chat.assert_not_called()
 
-    def test_calls_llm_for_group_with_3_plus(self):
+    def test_calls_llm_for_group_with_2_plus(self):
         ltm = _mock_ltm()
-        members = [_ltm_memory(f"fact {i}") for i in range(3)]
+        members = [_ltm_memory(f"fact {i}") for i in range(2)]
         ltm.get_all.return_value = members
         agent = _agent(ltm=ltm)
 

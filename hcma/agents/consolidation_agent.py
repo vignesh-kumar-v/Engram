@@ -167,7 +167,7 @@ class ConsolidationAgent:
                 source_episode_ids=[entry.id],
                 created_at=now,
                 last_accessed=now,
-                memory_type=self._infer_memory_type(entry.tags),
+                memory_type=self._infer_memory_type(entry.tags, entry.content),
             )
             if not self.ltm.write(memory):
                 return False
@@ -230,7 +230,7 @@ class ConsolidationAgent:
 
         flags: List[ContradictionFlag] = []
         for mtype, members in groups.items():
-            if len(members) < 3:
+            if len(members) < 2:
                 continue
             flags.extend(self._check_group_for_contradictions(members))
 
@@ -310,11 +310,11 @@ class ConsolidationAgent:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _infer_memory_type(self, tags: List[str]) -> str:
+    def _infer_memory_type(self, tags: List[str], content: str = "") -> str:
         tag_set = set(tags)
         if "error_pattern" in tag_set or "debug" in tag_set:
             return "error"
-        if "preference" in tag_set:
+        if "preference" in tag_set or "prefer" in content.lower():
             return "preference"
         if "pattern" in tag_set:
             return "pattern"
