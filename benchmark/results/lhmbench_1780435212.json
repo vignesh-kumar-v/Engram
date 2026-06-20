@@ -1,0 +1,221 @@
+{
+  "timestamp": 1780435212,
+  "summary": {
+    "systems": {
+      "no_memory": {
+        "total_score": 2.533333333333333,
+        "max_score": 5.0,
+        "percentage": 50.66666666666666,
+        "per_scenario": {
+          "retention": 0.2,
+          "interference": 1.0,
+          "contradiction": 0.0,
+          "compression": 0.3333333333333333,
+          "retrieval_precision": 1.0
+        }
+      },
+      "naive_rag": {
+        "total_score": 5.0,
+        "max_score": 5.0,
+        "percentage": 100.0,
+        "per_scenario": {
+          "retention": 1.0,
+          "interference": 1.0,
+          "contradiction": 1.0,
+          "compression": 1.0,
+          "retrieval_precision": 1.0
+        }
+      },
+      "engram": {
+        "total_score": 4.0,
+        "max_score": 5.0,
+        "percentage": 80.0,
+        "per_scenario": {
+          "retention": 1.0,
+          "interference": 1.0,
+          "contradiction": 0.0,
+          "compression": 1.0,
+          "retrieval_precision": 1.0
+        }
+      }
+    },
+    "winner": "naive_rag",
+    "scenario_winners": {
+      "retention": "naive_rag",
+      "interference": "no_memory",
+      "contradiction": "naive_rag",
+      "compression": "naive_rag",
+      "retrieval_precision": "no_memory"
+    }
+  },
+  "results": [
+    {
+      "scenario_name": "retention",
+      "system_name": "no_memory",
+      "score": 0.2,
+      "max_score": 1.0,
+      "details": [
+        "FAIL | Q: 'What naming convention does the user prefer?' | expected 'snake_case' | got: 'To provide an accurate answer, I would need more context about which specific us'",
+        "FAIL | Q: 'What Python version is the user using?' | expected '3.11' | got: 'To determine which Python version a user is currently using, you can run the fol'",
+        "FAIL | Q: 'What framework had async issues?' | expected 'FastAPI' | got: 'There have been several frameworks that have faced async-related issues over the'",
+        "FAIL | Q: 'Does the user use type hints?' | expected 'yes' | got: 'To better assist you, could you please provide more context about which specific'",
+        "PASS | Q: 'What database does the user use?' | expected 'PostgreSQL' | got: 'To accurately answer your question about which database a specific user is using'"
+      ],
+      "duration_seconds": 34.385716915130615
+    },
+    {
+      "scenario_name": "interference",
+      "system_name": "no_memory",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What index does a Python list start at?' | got: 'A Python list starts indexing at 0. This means the first element in a list is accessible with the index 0, the second el'"
+      ],
+      "duration_seconds": 3.890707492828369
+    },
+    {
+      "scenario_name": "contradiction",
+      "system_name": "no_memory",
+      "score": 0.0,
+      "max_score": 1.0,
+      "details": [
+        "FAIL | Q: 'Does the user prefer tabs or spaces?' | got: 'To determine if the user prefers tabs or spaces, I would need more specific information about their preferences or setti'"
+      ],
+      "duration_seconds": 2.7442922592163086
+    },
+    {
+      "scenario_name": "compression",
+      "system_name": "no_memory",
+      "score": 0.3333333333333333,
+      "max_score": 1.0,
+      "details": [
+        "FAIL | Q: 'What error occurred in tree traversal?' | expected 'RecursionError' | got: 'Tree traversal errors can occur for several reasons depending on the specific im'",
+        "PASS | Q: 'What was the fix for the recursion issue?' | expected 'iterative' | got: 'To provide an accurate answer about what fixed a specific recursion issue, I wou'",
+        "FAIL | Q: 'How many nodes did the tree have?' | expected '5000' | got: 'To accurately answer how many nodes a tree has, I would need more specific infor'"
+      ],
+      "duration_seconds": 36.657794713974
+    },
+    {
+      "scenario_name": "retrieval_precision",
+      "system_name": "no_memory",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What do you know about decorators?' | got: 'Decorators in Python are a powerful and flexible tool that allow you to modify or enhance the behavior of functions or m'"
+      ],
+      "duration_seconds": 17.979366064071655
+    },
+    {
+      "scenario_name": "retention",
+      "system_name": "naive_rag",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What naming convention does the user prefer?' | expected 'snake_case' | got: 'The user prefers snake_case for variable naming.'",
+        "PASS | Q: 'What Python version is the user using?' | expected '3.11' | got: 'The user is using Python 3.11 for their main project.'",
+        "PASS | Q: 'What framework had async issues?' | expected 'FastAPI' | got: 'Based on the context provided, the framework that had async issues is FastAPI. T'",
+        "PASS | Q: 'Does the user use type hints?' | expected 'yes' | got: 'Yes, the user uses type hints. The context provided indicates that the user pref'",
+        "PASS | Q: 'What database does the user use?' | expected 'PostgreSQL' | got: 'The user uses PostgreSQL as their database.'"
+      ],
+      "duration_seconds": 17.329206228256226
+    },
+    {
+      "scenario_name": "interference",
+      "system_name": "naive_rag",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What index does a Python list start at?' | got: 'A Python list starts at index 0. This means that the first element in a list is accessible via the index 0, not 1.'"
+      ],
+      "duration_seconds": 8.958321571350098
+    },
+    {
+      "scenario_name": "contradiction",
+      "system_name": "naive_rag",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'Does the user prefer tabs or spaces?' | got: 'The user prefers spaces for indentation, but according to PEP 8 recommendations, spaces are preferred over tabs. It seem'"
+      ],
+      "duration_seconds": 5.122960805892944
+    },
+    {
+      "scenario_name": "compression",
+      "system_name": "naive_rag",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What error occurred in tree traversal?' | expected 'RecursionError' | got: 'The error that occurred during the tree traversal was a `RecursionError`. This e'",
+        "PASS | Q: 'What was the fix for the recursion issue?' | expected 'iterative' | got: 'The fix for the recursion issue involved converting the recursive Depth-First Se'",
+        "PASS | Q: 'How many nodes did the tree have?' | expected '5000' | got: 'According to the context provided, the tree had approximately 5000 nodes.'"
+      ],
+      "duration_seconds": 6.696415185928345
+    },
+    {
+      "scenario_name": "retrieval_precision",
+      "system_name": "naive_rag",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What do you know about decorators?' | got: 'Decorators in Python are a powerful and flexible tool that allow you to modify or extend the behavior of functions, meth'"
+      ],
+      "duration_seconds": 19.888813734054565
+    },
+    {
+      "scenario_name": "retention",
+      "system_name": "engram",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What naming convention does the user prefer?' | expected 'snake_case' | got: 'The user prefers snake_case for variable naming.'",
+        "PASS | Q: 'What Python version is the user using?' | expected '3.11' | got: 'The user is using Python 3.11 for their main project.'",
+        "PASS | Q: 'What framework had async issues?' | expected 'FastAPI' | got: 'Based on the context provided, it seems that the user is experiencing async issu'",
+        "PASS | Q: 'Does the user use type hints?' | expected 'yes' | got: 'Yes, the user uses type hints. The context indicates that the user prefers type '",
+        "PASS | Q: 'What database does the user use?' | expected 'PostgreSQL' | got: 'The user uses PostgreSQL as their database.'"
+      ],
+      "duration_seconds": 12.491757869720459
+    },
+    {
+      "scenario_name": "interference",
+      "system_name": "engram",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What index does a Python list start at?' | got: 'A Python list starts at index 0. This means that the first element in a Python list is accessed with an index of 0, not '"
+      ],
+      "duration_seconds": 10.783432960510254
+    },
+    {
+      "scenario_name": "contradiction",
+      "system_name": "engram",
+      "score": 0.0,
+      "max_score": 1.0,
+      "details": [
+        "FAIL | 0 contradiction flag(s) detected by HCMA"
+      ],
+      "duration_seconds": 4.3226377964019775
+    },
+    {
+      "scenario_name": "compression",
+      "system_name": "engram",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What error occurred in tree traversal?' | expected 'RecursionError' | got: 'The error that occurred during the tree traversal was a `RecursionError`. This h'",
+        "PASS | Q: 'What was the fix for the recursion issue?' | expected 'iterative' | got: 'The fix for the recursion issue involved converting the recursive Depth-First Se'",
+        "PASS | Q: 'How many nodes did the tree have?' | expected '5000' | got: 'The tree had approximately 5000 nodes.'"
+      ],
+      "duration_seconds": 12.917124032974243
+    },
+    {
+      "scenario_name": "retrieval_precision",
+      "system_name": "engram",
+      "score": 1.0,
+      "max_score": 1.0,
+      "details": [
+        "PASS | Q: 'What do you know about decorators?' | got: 'Decorators in Python are a powerful feature that allow you to modify or enhance the behavior of functions or methods. Th'"
+      ],
+      "duration_seconds": 27.69582438468933
+    }
+  ]
+}
