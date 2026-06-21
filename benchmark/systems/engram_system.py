@@ -75,5 +75,19 @@ class EngramSystem(BaseSystem):
             logger.exception("EngramSystem.query failed")
             return ""
 
+    def after_session(self) -> None:
+        try:
+            self._consolidation_agent.run()
+        except Exception:
+            logger.exception("EngramSystem.after_session: consolidation failed")
+
+    def get_session_state(self) -> dict:
+        raw_count = len(self._buf.read_all_raw())
+        return {
+            "buffer_raw": raw_count,
+            "ltm_memories": len(self._ltm.get_all()),
+            "contradictions": len(self._ltm.get_unresolved_contradictions()),
+        }
+
     def reset(self) -> None:
         self._init_components()

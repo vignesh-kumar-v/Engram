@@ -216,6 +216,19 @@ class TestDecide:
         assert decision.action == "compress"
         assert decision.existing_memory_id == mem_id
 
+    def test_parse_decision_strips_brackets_from_existing_id(self):
+        """LLM echoes the [xxxxxxxx] format from the prompt — brackets must be stripped."""
+        agent = _agent()
+        resp = _llm_response(
+            "ACTION: compress\nEXISTING_ID: [abcd1234]\nREASONING: Duplicate."
+        )
+        with patch.object(agent._client, "chat", return_value=resp):
+            decision = agent._decide(_entry())
+        assert decision.action == "compress"
+        assert "[" not in decision.existing_memory_id
+        assert "]" not in decision.existing_memory_id
+        assert decision.existing_memory_id == "abcd1234"
+
     def test_fallback_on_llm_failure(self):
         agent = _agent()
         with patch.object(agent._client, "chat", side_effect=RuntimeError("down")):
@@ -561,3 +574,54 @@ class TestCompress:
 
         updated = ltm.read(existing.id)
         assert e.id in updated.source_episode_ids
+
+    def test_compress_resolves_8char_prefix(self, tmp_path):
+        """_compress must succeed when given only the 8-char prefix, not the full UUID."""
+        ltm = self._real_ltm_store(tmp_path)
+        existing = _ltm_memory("Original Python fact")
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            ltm.write(existing)
+
+        buf = _buf()
+        e = _entry("Additional info")
+        buf.write(e)
+
+        agent = ConsolidationAgent(buf, ltm)
+        # Pass only the 8-char prefix — as the LLM would after bracket-stripping
+        prefix = existing.id[:8]
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            result = agent._compress(e, prefix)
+
+        assert result is True
+        updated = ltm.read(existing.id)
+        assert "Additional info" in updated.content
+
+    def test_compress_resolves_bracketed_prefix_after_strip(self, tmp_path):
+        """End-to-end: LLM returns [xxxxxxxx], _parse_decision strips brackets,
+        _compress resolves the 8-char prefix to the correct full UUID."""
+        ltm = self._real_ltm_store(tmp_path)
+        existing = _ltm_memory("FastAPI routing fact")
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            ltm.write(existing)
+
+        buf = _buf()
+        e = _entry("More routing info")
+        buf.write(e)
+
+        agent = ConsolidationAgent(buf, ltm)
+
+        # Simulate the full LLM response with bracketed prefix
+        bracketed_response = _llm_response(
+            f"ACTION: compress\nEXISTING_ID: [{existing.id[:8]}]\nREASONING: Same topic."
+        )
+
+        with patch.object(agent._client, "chat", return_value=bracketed_response):
+            with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+                # _decide → _compress: the full pipeline
+                decision = agent._decide(e)
+
+        assert decision.action == "compress"
+        assert "[" not in decision.existing_memory_id
+        # The stripped prefix should resolve via read_by_prefix
+        resolved = ltm.read_by_prefix(decision.existing_memory_id)
+        assert resolved is not None and resolved.id == existing.id

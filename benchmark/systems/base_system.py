@@ -22,3 +22,10 @@ class BaseSystem(ABC):
     @abstractmethod
     def name(self) -> str:
         """Return the system name string."""
+
+    def after_session(self) -> None:
+        """Called after a session's facts are ingested. Override to consolidate."""
+
+    def get_session_state(self) -> dict:
+        """Return current memory state for trace printing."""
+        return {}

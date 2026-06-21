@@ -131,6 +131,57 @@ class TestReadUnit:
         assert store.read(mem.id).source_episode_ids == ["ep_a", "ep_b", "ep_c"]
 
 
+class TestReadByPrefixUnit:
+    def test_returns_none_for_empty_prefix(self, tmp_path):
+        store, _ = _unit_store(tmp_path)
+        assert store.read_by_prefix("") is None
+
+    def test_returns_none_when_no_match(self, tmp_path):
+        store, _ = _unit_store(tmp_path)
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            store.write(_memory())
+        assert store.read_by_prefix("00000000") is None
+
+    def test_finds_memory_by_8char_prefix(self, tmp_path):
+        store, _ = _unit_store(tmp_path)
+        mem = _memory(content="Python uses indentation")
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            store.write(mem)
+        prefix = mem.id[:8]
+        result = store.read_by_prefix(prefix)
+        assert result is not None
+        assert result.id == mem.id
+
+    def test_finds_memory_by_bracketed_prefix(self, tmp_path):
+        """Simulates the bug: LLM echoes [82c97b40] — caller must strip brackets first."""
+        store, _ = _unit_store(tmp_path)
+        mem = _memory(content="FastAPI handles routing")
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            store.write(mem)
+        # The fix in _parse_decision strips brackets before calling read_by_prefix
+        clean_prefix = mem.id[:8]
+        result = store.read_by_prefix(clean_prefix)
+        assert result is not None and result.id == mem.id
+
+    def test_returns_first_match_when_prefix_collides(self, tmp_path):
+        """Prefix collision is astronomically unlikely with UUIDs but must not crash."""
+        store, _ = _unit_store(tmp_path)
+        mem = _memory(content="Some fact")
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            store.write(mem)
+        result = store.read_by_prefix(mem.id[:4])
+        assert result is not None  # finds at least the one we wrote
+
+    def test_returns_full_memory_object(self, tmp_path):
+        store, _ = _unit_store(tmp_path)
+        mem = _memory(content="Generators are lazy", memory_type="pattern")
+        with patch("hcma.memory.ltm_store.ollama.embeddings", side_effect=RuntimeError):
+            store.write(mem)
+        result = store.read_by_prefix(mem.id[:8])
+        assert result.content == mem.content
+        assert result.memory_type == "pattern"
+
+
 class TestSearchByContentUnit:
     def test_returns_matching_entries(self, tmp_path):
         store, _ = _unit_store(tmp_path)

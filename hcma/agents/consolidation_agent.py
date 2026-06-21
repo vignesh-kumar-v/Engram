@@ -145,7 +145,8 @@ class ConsolidationAgent:
                     if raw in {"promote", "compress", "discard"}:
                         action = raw
                 elif line.startswith("EXISTING_ID:"):
-                    existing_id = line.split("EXISTING_ID:", 1)[1].strip()
+                    # LLM echoes the bracketed format from the prompt: [82c97b40]
+                    existing_id = line.split("EXISTING_ID:", 1)[1].strip().strip("[]")
                 elif line.startswith("REASONING:"):
                     reasoning = line.split("REASONING:", 1)[1].strip()
         except Exception:
@@ -180,6 +181,10 @@ class ConsolidationAgent:
     def _compress(self, entry: EpisodicEntry, existing_memory_id: str) -> bool:
         try:
             existing = self.ltm.read(existing_memory_id)
+            if existing is None and existing_memory_id:
+                # LLM may have returned only the 8-char prefix shown in the
+                # prompt summary — try a prefix lookup before falling back.
+                existing = self.ltm.read_by_prefix(existing_memory_id)
             if existing is None:
                 logger.warning(
                     "_compress: existing memory %s not found, falling back to promote",

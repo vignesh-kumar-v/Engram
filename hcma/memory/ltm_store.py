@@ -165,6 +165,20 @@ class LTMStore:
             logger.exception("read failed for memory_id=%s", memory_id)
             return None
 
+    def read_by_prefix(self, id_prefix: str) -> Optional[LTMMemory]:
+        """Return the first memory whose id starts with id_prefix, or None."""
+        if not id_prefix:
+            return None
+        try:
+            row = self._conn.execute(
+                "SELECT * FROM ltm_memories WHERE id LIKE ?",
+                (id_prefix + "%",),
+            ).fetchone()
+            return _row_to_memory(row) if row else None
+        except Exception:
+            logger.exception("read_by_prefix failed for prefix=%s", id_prefix)
+            return None
+
     def search_semantic(self, query: str, top_k: int = 5) -> List[LTMMemory]:
         embedding = self._get_embedding(query)
         if not embedding:

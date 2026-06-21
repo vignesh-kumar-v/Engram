@@ -24,6 +24,7 @@ class NaiveRagSystem(BaseSystem):
         self._tmpdir = tempfile.mkdtemp(prefix="naive_rag_")
         self._client = ollama.Client()
         self._qdrant = QdrantClient(path=self._tmpdir)
+        self._stored_count: int = 0
         self._ensure_collection()
 
     @property
@@ -60,6 +61,7 @@ class NaiveRagSystem(BaseSystem):
                 )
             ],
         )
+        self._stored_count += 1
 
     def query(self, question: str) -> str:
         embedding = self._embed(question)
@@ -88,7 +90,11 @@ class NaiveRagSystem(BaseSystem):
             logger.exception("NaiveRagSystem.query failed")
             return ""
 
+    def get_session_state(self) -> dict:
+        return {"stored_vectors": self._stored_count}
+
     def reset(self) -> None:
+        self._stored_count = 0
         try:
             if self._qdrant.collection_exists(_COLLECTION):
                 self._qdrant.delete_collection(_COLLECTION)
