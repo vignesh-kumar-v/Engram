@@ -21,7 +21,7 @@ def main() -> None:
         collection_name=settings.LTM_COLLECTION_NAME,
     )
     session_id = f"{settings.SESSION_ID_PREFIX}_{int(time.time())}"
-    agent = TaskAgent(buffer=buf, session_id=session_id)
+    agent = TaskAgent(buffer=buf, session_id=session_id, ltm=ltm)
     consolidation_agent = ConsolidationAgent(buffer=buf, ltm=ltm)
     loop = ConsolidationLoop(
         buffer=buf,

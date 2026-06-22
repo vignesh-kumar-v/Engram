@@ -8,6 +8,8 @@ import pytest
 
 from hcma.agents.task_agent import TaskAgent
 from hcma.memory.episodic_buffer import EpisodicBuffer
+from hcma.memory.ltm_store import LTMStore
+from hcma.schemas.memory_types import LTMMemory
 
 
 # ---------------------------------------------------------------------------
@@ -244,3 +246,92 @@ class TestLLMFailure:
         with patch.object(agent._client, "chat", side_effect=RuntimeError("timeout")):
             agent.run("any question")
         assert buf.get_count() == 0
+
+
+# ---------------------------------------------------------------------------
+# LTM retrieval injection
+# ---------------------------------------------------------------------------
+
+def _fake_ltm(memories: list[LTMMemory]) -> MagicMock:
+    ltm = MagicMock(spec=LTMStore)
+    ltm.search_semantic.return_value = memories
+    return ltm
+
+
+def _fake_memory(content: str) -> LTMMemory:
+    import time as _time
+    return LTMMemory(
+        content=content,
+        source_episode_ids=["ep-1"],
+        created_at=_time.time(),
+        last_accessed=_time.time(),
+    )
+
+
+class TestLTMRetrieval:
+    def test_memory_context_injected_into_system_prompt(self):
+        ltm = _fake_ltm([_fake_memory("User prefers type hints in all functions")])
+        agent = TaskAgent(_buf(), session_id=_SESSION, ltm=ltm)
+        with patch.object(agent._client, "chat", return_value=_mock_chat_response()) as mock_chat:
+            agent.run("How do I write a function?")
+        messages = mock_chat.call_args.kwargs.get("messages") or mock_chat.call_args.args[1]
+        system_content = messages[0]["content"]
+        assert "coding assistant" in system_content
+        assert "User prefers type hints" in system_content
+
+    def test_memory_context_not_stored_in_conversation_history(self):
+        ltm = _fake_ltm([_fake_memory("User prefers type hints in all functions")])
+        agent = TaskAgent(_buf(), session_id=_SESSION, ltm=ltm)
+        with patch.object(agent._client, "chat", return_value=_mock_chat_response()):
+            agent.run("How do I write a function?")
+        for msg in agent.conversation_history:
+            assert "Relevant memories" not in msg["content"]
+
+    def test_no_ltm_system_prompt_unchanged(self):
+        agent = TaskAgent(_buf(), session_id=_SESSION, ltm=None)
+        with patch.object(agent._client, "chat", return_value=_mock_chat_response()) as mock_chat:
+            agent.run("How do I write a function?")
+        messages = mock_chat.call_args.kwargs.get("messages") or mock_chat.call_args.args[1]
+        from hcma.agents.task_agent import _SYSTEM_PROMPT
+        assert messages[0]["content"] == _SYSTEM_PROMPT
+
+    def test_empty_ltm_results_leave_system_prompt_unchanged(self):
+        ltm = _fake_ltm([])
+        agent = TaskAgent(_buf(), session_id=_SESSION, ltm=ltm)
+        with patch.object(agent._client, "chat", return_value=_mock_chat_response()) as mock_chat:
+            agent.run("How do I write a function?")
+        messages = mock_chat.call_args.kwargs.get("messages") or mock_chat.call_args.args[1]
+        from hcma.agents.task_agent import _SYSTEM_PROMPT
+        assert messages[0]["content"] == _SYSTEM_PROMPT
+
+    def test_ltm_search_failure_falls_back_gracefully(self):
+        ltm = MagicMock(spec=LTMStore)
+        ltm.search_semantic.side_effect = RuntimeError("qdrant unavailable")
+        agent = TaskAgent(_buf(), session_id=_SESSION, ltm=ltm)
+        with patch.object(agent._client, "chat", return_value=_mock_chat_response()) as mock_chat:
+            result = agent.run("test question")
+        assert result == _LLM_REPLY
+        messages = mock_chat.call_args.kwargs.get("messages") or mock_chat.call_args.args[1]
+        from hcma.agents.task_agent import _SYSTEM_PROMPT
+        assert messages[0]["content"] == _SYSTEM_PROMPT
+
+    def test_multiple_memories_all_injected(self):
+        ltm = _fake_ltm([
+            _fake_memory("User prefers pytest over unittest"),
+            _fake_memory("Project uses Python 3.11"),
+        ])
+        agent = TaskAgent(_buf(), session_id=_SESSION, ltm=ltm)
+        with patch.object(agent._client, "chat", return_value=_mock_chat_response()) as mock_chat:
+            agent.run("How do I run tests?")
+        messages = mock_chat.call_args.kwargs.get("messages") or mock_chat.call_args.args[1]
+        system_content = messages[0]["content"]
+        assert "User prefers pytest" in system_content
+        assert "Python 3.11" in system_content
+
+    def test_ltm_search_called_with_user_query(self):
+        ltm = _fake_ltm([])
+        agent = TaskAgent(_buf(), session_id=_SESSION, ltm=ltm)
+        user_query = "How do I use async/await?"
+        with patch.object(agent._client, "chat", return_value=_mock_chat_response()):
+            agent.run(user_query)
+        ltm.search_semantic.assert_called_once_with(user_query, top_k=3)

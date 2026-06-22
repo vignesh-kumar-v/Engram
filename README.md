@@ -261,7 +261,7 @@ Engram is a research prototype, not a production system. MemGPT is production-gr
 - ✅ **Phase 1** — Core pipeline: EpisodicBuffer, LTMStore, TaskAgent, ConsolidationAgent
 - ✅ **Phase 2** — Contradiction persistence, consolidation loop, CLI commands
 - ✅ **Phase 3** — LHMBench: 6-scenario suite + multi-session lifecycle harness, BenchmarkRunner, BenchmarkEvaluator
-- 🔄 **Phase 4** — Multi-session persistence: persistent sessions across process restarts, cross-session retention scoring
+- ✅ **Phase 4** — Multi-session persistence: SQLite + Qdrant file-backed stores survive restarts; LTM retrieval grounding in TaskAgent (relevant memories injected into system prompt per turn); cross-session retention validated by multi-session lifecycle benchmark
 - ⬜ **Phase 5** — Fine-tuning: collect consolidation decisions from benchmark runs, fine-tune a smaller consolidation model on promote/compress/discard labels
 
 ---

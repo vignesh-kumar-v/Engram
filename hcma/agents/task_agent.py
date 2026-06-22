@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import ollama
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from hcma.config import settings
 from hcma.memory.episodic_buffer import EpisodicBuffer
+from hcma.memory.ltm_store import LTMStore
 from hcma.schemas.memory_types import EpisodicEntry
 
 logger = logging.getLogger(__name__)
@@ -25,16 +26,22 @@ _LLM_FALLBACK = "I encountered an error. Please try again."
 
 
 class TaskAgent:
-    def __init__(self, buffer: EpisodicBuffer, session_id: str) -> None:
+    def __init__(
+        self,
+        buffer: EpisodicBuffer,
+        session_id: str,
+        ltm: Optional[LTMStore] = None,
+    ) -> None:
         self.buffer = buffer
         self.session_id = session_id
+        self.ltm = ltm
         self._client = ollama.Client(host=settings.OLLAMA_BASE_URL)
         self.conversation_history: List[Dict[str, str]] = []
 
     def run(self, user_input: str) -> str:
         self.conversation_history.append({"role": "user", "content": user_input})
-        response = self._get_llm_response()
-            
+        memory_context = self._retrieve_memory_context(user_input)
+        response = self._get_llm_response(memory_context)
         self.conversation_history.append({"role": "assistant", "content": response})
         if response == _LLM_FALLBACK:
             logger.warning("Skipping episodic write due to LLM failure")
@@ -42,12 +49,26 @@ class TaskAgent:
             self._extract_and_store_observations(user_input, response)
         return response
 
+    def _retrieve_memory_context(self, query: str) -> str:
+        if self.ltm is None:
+            return ""
+        try:
+            memories = self.ltm.search_semantic(query, top_k=settings.LTM_TOP_K)
+            if not memories:
+                return ""
+            lines = "\n".join(f"- {m.content}" for m in memories)
+            return f"\n\nRelevant memories from previous sessions:\n{lines}"
+        except Exception:
+            logger.exception("_retrieve_memory_context failed for query=%r", query[:60])
+            return ""
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
     def _do_chat(self, messages):
         return self._client.chat(model=settings.OLLAMA_MODEL, messages=messages)
 
-    def _get_llm_response(self) -> str:
-        messages = [{"role": "system", "content": _SYSTEM_PROMPT}] + self.conversation_history
+    def _get_llm_response(self, memory_context: str = "") -> str:
+        system_content = _SYSTEM_PROMPT + memory_context
+        messages = [{"role": "system", "content": system_content}] + self.conversation_history
         try:
             result = self._do_chat(messages)
             if result.message.content is None:
