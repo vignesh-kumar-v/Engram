@@ -7,6 +7,7 @@ import time
 from typing import Dict, List
 
 import ollama
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from hcma.config import settings
 from hcma.memory.episodic_buffer import EpisodicBuffer
@@ -33,6 +34,7 @@ class TaskAgent:
     def run(self, user_input: str) -> str:
         self.conversation_history.append({"role": "user", "content": user_input})
         response = self._get_llm_response()
+            
         self.conversation_history.append({"role": "assistant", "content": response})
         if response == _LLM_FALLBACK:
             logger.warning("Skipping episodic write due to LLM failure")
@@ -40,10 +42,16 @@ class TaskAgent:
             self._extract_and_store_observations(user_input, response)
         return response
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
+    def _do_chat(self, messages):
+        return self._client.chat(model=settings.OLLAMA_MODEL, messages=messages)
+
     def _get_llm_response(self) -> str:
         messages = [{"role": "system", "content": _SYSTEM_PROMPT}] + self.conversation_history
         try:
-            result = self._client.chat(model=settings.OLLAMA_MODEL, messages=messages)
+            result = self._do_chat(messages)
+            if result.message.content is None:
+                return _LLM_FALLBACK
             return result.message.content
         except Exception:
             logger.exception("_get_llm_response failed")

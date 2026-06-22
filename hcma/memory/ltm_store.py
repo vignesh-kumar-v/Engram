@@ -12,6 +12,7 @@ from typing import List, Optional
 import ollama
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointIdsList, PointStruct, VectorParams
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from hcma.schemas.memory_types import ContradictionFlag, LTMMemory
 
@@ -74,6 +75,8 @@ class LTMStore:
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL;")
+        self._conn.execute("PRAGMA synchronous=NORMAL;")
         self._conn.execute(_CREATE_TABLE)
         self._conn.execute(_CREATE_CONTRADICTIONS_TABLE)
         self._conn.commit()
@@ -99,10 +102,14 @@ class LTMStore:
             logger.exception("_ensure_collection failed")
             raise
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
+    def _do_get_embedding(self, content: str):
+        return ollama.embeddings(model=_EMBED_MODEL, prompt=content)
+
     def _get_embedding(self, content: str) -> List[float]:
         try:
-            result = ollama.embeddings(model=_EMBED_MODEL, prompt=content)
-            return result.embedding
+            result = self._do_get_embedding(content)
+            return list(result.embedding)
         except Exception:
             logger.error("_get_embedding failed for content starting with '%s'", content[:60])
             return []
@@ -181,6 +188,7 @@ class LTMStore:
 
     def search_semantic(self, query: str, top_k: int = 5) -> List[LTMMemory]:
         embedding = self._get_embedding(query)
+            
         if not embedding:
             logger.warning("search_semantic: embedding failed, falling back to search_by_content")
             return self.search_by_content(query, top_k)
@@ -193,7 +201,7 @@ class LTMStore:
             )
             memories: List[LTMMemory] = []
             for point in results.points:
-                ltm_id = point.payload.get("ltm_id")
+                ltm_id = point.payload.get("ltm_id") if point.payload else None
                 if ltm_id:
                     mem = self.read(ltm_id)
                     if mem:

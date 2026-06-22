@@ -6,7 +6,9 @@ import logging
 import time
 from typing import List
 
+import re
 import ollama
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from hcma.config import settings
 from hcma.memory.episodic_buffer import EpisodicBuffer
@@ -70,6 +72,7 @@ class ConsolidationAgent:
 
         for entry in entries:
             decision = self._decide(entry)
+                
             logger.debug(
                 "Entry %s → action=%s reason=%s",
                 entry.id[:8], decision.action, decision.reasoning,
@@ -101,6 +104,16 @@ class ConsolidationAgent:
     # Decision
     # ------------------------------------------------------------------
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
+    def _do_chat(self, system_prompt, user_message):
+        return self._client.chat(
+            model=settings.CONSOLIDATION_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+
     def _decide(self, entry: EpisodicEntry) -> Decision:
         ltm_memories = self.ltm.get_all()[:5]
         if ltm_memories:
@@ -120,13 +133,9 @@ class ConsolidationAgent:
         )
 
         try:
-            response = self._client.chat(
-                model=settings.CONSOLIDATION_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-            )
+            response = self._do_chat(system_prompt, user_message)
+            if response.message.content is None:
+                return Decision(action="promote", reasoning="fallback: empty LLM response")
             return self._parse_decision(response.message.content)
         except Exception:
             logger.exception("_decide: LLM call failed for entry %s", entry.id[:8])
@@ -145,8 +154,12 @@ class ConsolidationAgent:
                     if raw in {"promote", "compress", "discard"}:
                         action = raw
                 elif line.startswith("EXISTING_ID:"):
-                    # LLM echoes the bracketed format from the prompt: [82c97b40]
-                    existing_id = line.split("EXISTING_ID:", 1)[1].strip().strip("[]")
+                    raw_id = line.split("EXISTING_ID:", 1)[1].strip()
+                    match = re.search(r"([a-fA-F0-9\-]{8,})", raw_id)
+                    if match:
+                        existing_id = match.group(1)
+                    else:
+                        existing_id = raw_id.strip("[]`\"'")
                 elif line.startswith("REASONING:"):
                     reasoning = line.split("REASONING:", 1)[1].strip()
         except Exception:
@@ -253,13 +266,9 @@ class ConsolidationAgent:
         user_message = f"Check these memories for contradictions:\n{formatted}"
 
         try:
-            response = self._client.chat(
-                model=settings.CONSOLIDATION_MODEL,
-                messages=[
-                    {"role": "system", "content": _CONTRADICTION_SYSTEM},
-                    {"role": "user", "content": user_message},
-                ],
-            )
+            response = self._do_chat(_CONTRADICTION_SYSTEM, user_message)
+            if response.message.content is None:
+                return []
             return self._parse_contradictions(response.message.content, memories)
         except Exception:
             logger.exception("_check_group_for_contradictions: LLM call failed")
